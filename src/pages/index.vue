@@ -67,48 +67,61 @@
 </template>
 
 <script setup lang="ts">
-// Stopped, Slowing, Starting, Running
-const status = ref("Stopped")
+import { ref, watch } from 'vue'
 
+// ----- States -----
+const status = ref("Stopped") // Stopped, Slowing, Starting, Running
 const OutputPower = ref(0)
 const WinSpeed = ref(0)
-const Efficiency = ref(0)
+const Efficiency = ref(87)
 const YawDirection = ref(0)
 const BladePitch = ref(0)
-const Temperature = ref(0)
+const Temperature = ref(42)
 
-const duration = 3000        // 3 secondes
+// ----- Durées -----
+const changingStatusDuration = 3000 // ms
+const bladePitchChangeDuration = 300 // ms
 
-let start = 0;
-let end = 0;
+// ----- Utils -----
+function animate(from: number, to: number, duration: number, onUpdate: (val: number) => void, onComplete?: () => void) {
+  const startTime = performance.now()
 
-let startTime:never;
-
-function animate() {
-  const now = performance.now()
-  const elapsed = now - startTime
-  if (elapsed < duration) {
-    OutputPower.value = start - (elapsed / duration) * (start - end)
-    requestAnimationFrame(animate)
-  } else {
-    OutputPower.value = end
-    status.value = status.value === "Slowing" ? "Stopped" : "Running"
+  function frame(now: number) {
+    const elapsed = now - startTime
+    const t = Math.min(elapsed / duration, 1) // normalise de 0 à 1
+    onUpdate(from + (to - from) * t)
+    if (t < 1) {
+      requestAnimationFrame(frame)
+    } else if (onComplete) {
+      onComplete()
+    }
   }
+
+  requestAnimationFrame(frame)
+}
+
+// ----- BladePitch animation -----
+watch(BladePitch, (newValue) => {
+  const targetPower = 350 * (1 - newValue / 90)
+  animate(OutputPower.value, targetPower, bladePitchChangeDuration, val => OutputPower.value = val)
+})
+
+// ----- Status animation -----
+function animateStatus(from: number, to: number, nextStatus?: string) {
+  animate(from, to, changingStatusDuration, val => OutputPower.value = val, () => {
+    if (nextStatus) status.value = nextStatus
+  })
 }
 
 function animateToZero() {
   if (status.value === "Running") {
-    end = 0;
-  } else {
-    end = 350;
+    animateStatus(OutputPower.value, 0, "Stopped")
+    status.value = "Slowing"
+  } else if (status.value === "Stopped") {
+    animateStatus(OutputPower.value, 350, "Running")
+    status.value = "Starting"
   }
-  status.value = status.value === "Stopped" ? "Starting" : "Slowing"
-
-  start = OutputPower.value;
-  startTime = performance.now() as never;
-  requestAnimationFrame(animate)
 }
-
 </script>
 
 <style scoped>
