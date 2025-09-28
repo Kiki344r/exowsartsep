@@ -118,7 +118,7 @@ function animateToZero() {
     animateStatus(OutputPower.value, 0, "Stopped")
     status.value = "Slowing"
   } else if (status.value === "Stopped") {
-    animateStatus(OutputPower.value, 350, "Running")
+    animateStatus(OutputPower.value, 350 * (1 - BladePitch.value / 90), "Running")
     status.value = "Starting"
   }
 }
